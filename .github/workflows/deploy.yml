@@ -1,3 +1,53 @@
+name: CI/CD - SAM Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ap-south-1
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install prerequisites (python3, pip)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y python3 python3-pip zip unzip
+
+      - name: Install AWS SAM CLI
+        run: |
+          pip3 install --upgrade aws-sam-cli
+          sam --version
+
+      - name: Build (sam build)
+        run: |
+          sam build
+
+      - name: After sam build - list build dir (debug)
+        run: |
+          echo "PWD: $(pwd)"
+          echo "Listing repo root:"
+          ls -la
+          echo "Listing src:"
+          ls -la src || true
+          echo "Listing .aws-sam (if exists):"
+          ls -la .aws-sam || true
+          echo "Listing .aws-sam/build (if exists):"
+          ls -la .aws-sam/build || true
+
       - name: Deploy (sam deploy, ignore "No changes to deploy")
         run: |
           # Run sam deploy, capture output and exit code
