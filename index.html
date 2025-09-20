@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Todo App (Frontend — Edit/Delete/Toggle)</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; padding: 20px; max-width: 800px; }
+    li { margin: 8px 0; display:flex; align-items:center; gap:12px; }
+    .meta { color:#666; font-size:0.85rem; }
+    .btn { padding:6px 8px; border-radius:6px; border:1px solid #ddd; background:#fafafa; cursor:pointer; }
+    .btn:hover { background:#f0f0f0; }
+    .done { text-decoration: line-through; color: #666; }
+    input#new-task { width:60%; padding:6px; }
+  </style>
+</head>
+<body>
+  <h1>Todo App</h1>
+  <p>Simple frontend with Edit / Delete / Toggle-complete. API key is sent in header.</p>
+
+  <input id="new-task" placeholder="New task (e.g. Buy milk)" />
+  <button class="btn" onclick="createTodo()">Create</button>
+  <button class="btn" onclick="fetchTodos()">Refresh</button>
+
+  <ul id="todo-list"></ul>
+
+  <script>
+    const API_BASE = "https://d1wj0xsreg.execute-api.ap-south-1.amazonaws.com/Prod/todos";
+    const API_KEY = "HPp8M7CTHa1Bwgc0ucgdr7OCf6aqDE1y3YHsjejm";
+
+    function getTitle(todo) {
+      return todo.title || todo.task || todo.name || todo.taskName || "New todo";
+    }
+    function isDone(todo) {
+      if (typeof todo.done === "boolean") return todo.done;
+      if (typeof todo.completed === "boolean") return todo.completed;
+      if (todo.done === 1 || todo.completed === 1) return true;
+      return false;
+    }
+
+    async function fetchTodos() {
+      try {
+        const res = await fetch(API_BASE, { headers: { "x-api-key": API_KEY }});
+        if (!res.ok) { throw new Error(`${res.status} — ${await res.text()}`); }
+        const json = await res.json();
+        const items = Array.isArray(json) ? json : (json.items || json);
+        renderList(items || []);
+      } catch (e) {
+        alert("Error fetching todos: " + e.message);
+        console.error(e);
+      }
+    }
+
+    function renderList(items) {
+      const list = document.getElementById("todo-list");
+      list.innerHTML = "";
+      items.forEach(todo => {
+        const id = todo.id || todo.ID || todo._id || todo.todoId || "";
+        const title = getTitle(todo);
+        const done = isDone(todo);
+
+        const li = document.createElement("li");
+
+        const left = document.createElement("div");
+        left.style.flex = "1";
+        left.innerHTML = `<div><strong>${id}</strong></div>
+                          <div class="${done ? 'done' : ''}">${escapeHtml(title)}</div>
+                          <div class="meta">${todo.createdAt || todo.updatedAt || ''}</div>`;
+
+        const btnToggle = document.createElement("button");
+        btnToggle.className = "btn";
+        btnToggle.textContent = done ? "Mark Undone" : "Mark Done";
+        btnToggle.onclick = () => toggleDone(id, todo, !done);
+
+        const btnEdit = document.createElement("button");
+        btnEdit.className = "btn";
+        btnEdit.textContent = "Edit";
+        btnEdit.onclick = () => editTodoPrompt(id, todo);
+
+        const btnDelete = document.createElement("button");
+        btnDelete.className = "btn";
+        btnDelete.textContent = "Delete";
+        btnDelete.onclick = () => deleteTodo(id);
+
+        li.appendChild(left);
+        li.appendChild(btnToggle);
+        li.appendChild(btnEdit);
+        li.appendChild(btnDelete);
+        list.appendChild(li);
+      });
+    }
+
+    // safe-escape for text content injection
+    function escapeHtml(s){ return String(s||"").replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+
+    async function createTodo() {
+      const input = document.getElementById("new-task");
+      const t = (input.value || "").trim();
+      if (!t) { alert("Please type a task"); return; }
+      const body = { title: t, task: t, completed: false };
+      try {
+        const res = await fetch(API_BASE, {
+          method: "POST",
+          headers: { "Content-Type":"application/json", "x-api-key": API_KEY },
+          body: JSON.stringify(body)
+        });
+        if (!res.ok) throw new Error(`${res.status} — ${await res.text()}`);
+        input.value = "";
+        fetchTodos();
+      } catch (e) { alert("Create failed: " + e.message); console.error(e); }
+    }
+
+    async function deleteTodo(id) {
+      if (!id) { alert("Missing id"); return; }
+      if (!confirm("Delete this todo?")) return;
+      try {
+        const res = await fetch(`${API_BASE}/${id}`, {
+          method: "DELETE",
+          headers: { "x-api-key": API_KEY }
+        });
+        if (!res.ok) throw new Error(`${res.status} — ${await res.text()}`);
+        fetchTodos();
+      } catch (e) { alert("Delete failed: " + e.message); console.error(e); }
+    }
+
+    async function toggleDone(id, todo, newDone) {
+      if (!id) { alert("Missing id"); return; }
+      // Build an update body; adjust keys depending on backend expectations
+      const body = { completed: !!newDone, done: !!newDone, title: getTitle(todo) };
+      try {
+        const res = await fetch(`${API_BASE}/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type":"application/json", "x-api-key": API_KEY },
+          body: JSON.stringify(body)
+        });
+        if (!res.ok) throw new Error(`${res.status} — ${await res.text()}`);
+        fetchTodos();
+      } catch (e) { alert("Update failed: " + e.message); console.error(e); }
+    }
+
+    async function editTodoPrompt(id, todo) {
+      const current = getTitle(todo);
+      const updated = prompt("Edit task:", current);
+      if (updated === null) return; // cancelled
+      const text = (updated||"").trim();
+      if (!text) { alert("Empty tasks not allowed"); return; }
+      const body = { title: text, task: text };
+      try {
+        const res = await fetch(`${API_BASE}/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type":"application/json", "x-api-key": API_KEY },
+          body: JSON.stringify(body)
+        });
+        if (!res.ok) throw new Error(`${res.status} — ${await res.text()}`);
+        fetchTodos();
+      } catch (e) { alert("Edit failed: " + e.message); console.error(e); }
+    }
+
+    // initial load
+    fetchTodos();
+  </script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+name: CI/CD - SAM deploy
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y python3-pip
+          pip3 install --upgrade pip
+          pip3 install aws-sam-cli
+
+      - name: Build
+        run: sam build
+
+      - name: Deploy
+        run: sam deploy --stack-name TodoStack --capabilities CAPABILITY_NAMED_IAM --no-confirm-changeset --region ap-south-1
