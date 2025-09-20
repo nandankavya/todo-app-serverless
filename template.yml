@@ -1,0 +1,72 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Serverless Todo app (Lambda + API Gateway + DynamoDB)
+Globals:
+  Function:
+    Timeout: 10
+    Runtime: nodejs18.x
+    MemorySize: 128
+
+Resources:
+  TodosTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${AWS::StackName}-Todos"
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+  TodoFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-TodoFunction"
+      Handler: index.handler
+      CodeUri: src/
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref TodosTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TodosTable
+      Events:
+        GetTodos:
+          Type: Api
+          Properties:
+            Path: /todos
+            Method: GET
+        CreateTodo:
+          Type: Api
+          Properties:
+            Path: /todos
+            Method: POST
+        GetTodo:
+          Type: Api
+          Properties:
+            Path: /todos/{id}
+            Method: GET
+        UpdateTodo:
+          Type: Api
+          Properties:
+            Path: /todos/{id}
+            Method: PUT
+        DeleteTodo:
+          Type: Api
+          Properties:
+            Path: /todos/{id}
+            Method: DELETE
+
+Outputs:
+  ApiUrl:
+    Description: "API Gateway endpoint"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
+  TodoFunctionArn:
+    Description: "ARN of the Lambda function"
+    Value: !GetAtt TodoFunction.Arn
+  TodosTableName:
+    Description: "DynamoDB Todos table name"
+    Value: !Ref TodosTable
