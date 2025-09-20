@@ -40,26 +40,31 @@ Resources:
           Properties:
             Path: /todos
             Method: GET
+            Cors: "'*'"
         CreateTodo:
           Type: Api
           Properties:
             Path: /todos
             Method: POST
+            Cors: "'*'"
         GetTodo:
           Type: Api
           Properties:
             Path: /todos/{id}
             Method: GET
+            Cors: "'*'"
         UpdateTodo:
           Type: Api
           Properties:
             Path: /todos/{id}
             Method: PUT
+            Cors: "'*'"
         DeleteTodo:
           Type: Api
           Properties:
             Path: /todos/{id}
             Method: DELETE
+            Cors: "'*'"
 
 Outputs:
   ApiUrl:
