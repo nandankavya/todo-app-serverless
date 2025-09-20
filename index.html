@@ -15,7 +15,7 @@
 </head>
 <body>
   <h1>Todo App</h1>
-  <p>Simple frontend with Edit / Delete / Toggle-complete. API key is sent in header.</p>
+  <p>Simple frontend with Edit / Delete / Toggle-complete. Uses your deployed API endpoint.</p>
 
   <input id="new-task" placeholder="New task (e.g. Buy milk)" />
   <button class="btn" onclick="createTodo()">Create</button>
@@ -24,8 +24,8 @@
   <ul id="todo-list"></ul>
 
   <script>
-    const API_BASE = "https://d1wj0xsreg.execute-api.ap-south-1.amazonaws.com/Prod/todos";
-    const API_KEY = "HPp8M7CTHa1Bwgc0ucgdr7OCf6aqDE1y3YHsjejm";
+    // IMPORTANT: this is your API base (no trailing "/todos")
+    const API_BASE = "https://1s4vkmwrea.execute-api.ap-south-1.amazonaws.com/Prod";
 
     function getTitle(todo) {
       return todo.title || todo.task || todo.name || todo.taskName || "New todo";
@@ -39,10 +39,11 @@
 
     async function fetchTodos() {
       try {
-        const res = await fetch(API_BASE, { headers: { "x-api-key": API_KEY }});
+        const res = await fetch(`${API_BASE}/todos`);
         if (!res.ok) { throw new Error(`${res.status} — ${await res.text()}`); }
         const json = await res.json();
-        const items = Array.isArray(json) ? json : (json.items || json);
+        // Our backend returns { todos: [...] }
+        const items = Array.isArray(json) ? json : (json.todos || []);
         renderList(items || []);
       } catch (e) {
         alert("Error fetching todos: " + e.message);
@@ -62,9 +63,9 @@
 
         const left = document.createElement("div");
         left.style.flex = "1";
-        left.innerHTML = `<div><strong>${id}</strong></div>
+        left.innerHTML = `<div><strong>${escapeHtml(id)}</strong></div>
                           <div class="${done ? 'done' : ''}">${escapeHtml(title)}</div>
-                          <div class="meta">${todo.createdAt || todo.updatedAt || ''}</div>`;
+                          <div class="meta">${escapeHtml(todo.createdAt || todo.updatedAt || '')}</div>`;
 
         const btnToggle = document.createElement("button");
         btnToggle.className = "btn";
@@ -96,12 +97,20 @@
       const input = document.getElementById("new-task");
       const t = (input.value || "").trim();
       if (!t) { alert("Please type a task"); return; }
-      const body = { title: t, task: t, completed: false };
+
+      // IMPORTANT: backend expects an `id` in POST body, so we generate one here
+      const todo = {
+        id: Date.now().toString(),
+        title: t,
+        task: t,
+        completed: false
+      };
+
       try {
-        const res = await fetch(API_BASE, {
+        const res = await fetch(`${API_BASE}/todos`, {
           method: "POST",
-          headers: { "Content-Type":"application/json", "x-api-key": API_KEY },
-          body: JSON.stringify(body)
+          headers: { "Content-Type":"application/json" },
+          body: JSON.stringify(todo)
         });
         if (!res.ok) throw new Error(`${res.status} — ${await res.text()}`);
         input.value = "";
@@ -113,9 +122,8 @@
       if (!id) { alert("Missing id"); return; }
       if (!confirm("Delete this todo?")) return;
       try {
-        const res = await fetch(`${API_BASE}/${id}`, {
-          method: "DELETE",
-          headers: { "x-api-key": API_KEY }
+        const res = await fetch(`${API_BASE}/todos/${encodeURIComponent(id)}`, {
+          method: "DELETE"
         });
         if (!res.ok) throw new Error(`${res.status} — ${await res.text()}`);
         fetchTodos();
@@ -124,12 +132,11 @@
 
     async function toggleDone(id, todo, newDone) {
       if (!id) { alert("Missing id"); return; }
-      // Build an update body; adjust keys depending on backend expectations
       const body = { completed: !!newDone, done: !!newDone, title: getTitle(todo) };
       try {
-        const res = await fetch(`${API_BASE}/${id}`, {
+        const res = await fetch(`${API_BASE}/todos/${encodeURIComponent(id)}`, {
           method: "PUT",
-          headers: { "Content-Type":"application/json", "x-api-key": API_KEY },
+          headers: { "Content-Type":"application/json" },
           body: JSON.stringify(body)
         });
         if (!res.ok) throw new Error(`${res.status} — ${await res.text()}`);
@@ -145,9 +152,9 @@
       if (!text) { alert("Empty tasks not allowed"); return; }
       const body = { title: text, task: text };
       try {
-        const res = await fetch(`${API_BASE}/${id}`, {
+        const res = await fetch(`${API_BASE}/todos/${encodeURIComponent(id)}`, {
           method: "PUT",
-          headers: { "Content-Type":"application/json", "x-api-key": API_KEY },
+          headers: { "Content-Type":"application/json" },
           body: JSON.stringify(body)
         });
         if (!res.ok) throw new Error(`${res.status} — ${await res.text()}`);
